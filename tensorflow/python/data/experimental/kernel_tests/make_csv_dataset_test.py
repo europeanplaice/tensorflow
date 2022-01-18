@@ -108,6 +108,7 @@ class MakeCsvDatasetTest(test_base.DatasetTestBase, parameterized.TestCase):
                     batch_size=1,
                     num_epochs=1,
                     label_name=None,
+                    encoding="utf-8",
                     **kwargs):
     """Checks that elements produced by CsvDataset match expected output."""
     # Convert str type because py3 tf strings are bytestrings
@@ -118,6 +119,7 @@ class MakeCsvDatasetTest(test_base.DatasetTestBase, parameterized.TestCase):
         batch_size=batch_size,
         num_epochs=num_epochs,
         label_name=label_name,
+        encoding=encoding,
         **kwargs)
     self._verify_output(dataset, batch_size, num_epochs, label_name,
                         expected_output, expected_keys)
@@ -152,6 +154,36 @@ class MakeCsvDatasetTest(test_base.DatasetTestBase, parameterized.TestCase):
         shuffle=False,
         header=True,
         column_defaults=record_defaults,
+    )
+
+  @combinations.generate(test_base.default_test_combinations())
+  def testEncoding(self):
+    """Tests making a CSV dataset with an encoding except for utf-8."""
+    record_defaults = [
+        constant_op.constant([], dtypes.string),
+        constant_op.constant([], dtypes.string)
+    ]
+
+    column_names = ["col%d" % i for i in range(2)]
+    inputs = [[",".join(x for x in column_names), "さる,猿", "とり,鳥"], [
+        ",".join(x for x in column_names), "いぬ,犬", "ねこ,猫"
+    ]]
+    expected_output = [["さる", "猿"], ["とり", "鳥"],
+                       ["いぬ", "犬"], ["ねこ", "猫"]]
+    label = "col0"
+
+    self._test_dataset(
+        inputs,
+        expected_output=expected_output,
+        expected_keys=column_names,
+        column_names=column_names,
+        label_name=label,
+        batch_size=1,
+        num_epochs=1,
+        shuffle=False,
+        header=True,
+        column_defaults=record_defaults,
+        encoding="shift-jis",
     )
 
   @combinations.generate(test_base.default_test_combinations())
