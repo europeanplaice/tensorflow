@@ -647,13 +647,14 @@ def make_csv_dataset_v1(
     num_rows_for_inference=100,
     compression_type=None,
     ignore_errors=False,
+    encoding="utf-8",
 ):  # pylint: disable=missing-docstring
   return dataset_ops.DatasetV1Adapter(make_csv_dataset_v2(
       file_pattern, batch_size, column_names, column_defaults, label_name,
       select_columns, field_delim, use_quote_delim, na_value, header,
       num_epochs, shuffle, shuffle_buffer_size, shuffle_seed,
       prefetch_buffer_size, num_parallel_reads, sloppy, num_rows_for_inference,
-      compression_type, ignore_errors))
+      compression_type, ignore_errors, encoding))
 make_csv_dataset_v1.__doc__ = make_csv_dataset_v2.__doc__
 
 
