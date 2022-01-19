@@ -683,10 +683,15 @@ class FileIoTest(test.TestCase, parameterized.TestCase):
 
   def testReadWriteWithEncoding(self):
     file_path = file_io.join(self._base_dir, "temp_file")
-    with file_io.FileIO(file_path, mode="w", encoding="shift-jis") as f:
-      f.write("今日はいい天気")
-    with file_io.FileIO(file_path, mode="r", encoding="shift-jis") as f:
-      self.assertEqual(f.read(), "今日はいい天気")
+    with open("text.txt", mode="w", encoding="cp932") as f:
+        f.write("今日はいい天気")
+    with file_io.FileIO("text.txt", mode="r", encoding="cp932") as f:
+        assert f.read() == "今日はいい天気"
+
+    with file_io.FileIO("text.txt", mode="w", encoding="cp932") as f:
+        f.write("今日はいい天気")
+    with open("text.txt", mode="r", encoding="cp932") as f:
+        assert f.read() == "今日はいい天気"
 
 
 if __name__ == "__main__":
