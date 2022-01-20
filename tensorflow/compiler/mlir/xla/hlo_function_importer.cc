@@ -74,6 +74,11 @@ std::string SanitizeFunctionName(llvm::StringRef name) {
 
 // Returns whether the instruction is a default dot operation.
 bool DotIsDefault(const HloInstruction* instruction) {
+  const auto& operands = instruction->operands();
+  // eg. vector[3] dot matrix[3, 2] => [2] not default dot
+  if (operands[0]->shape().rank() < operands[1]->shape().rank()) {
+    return false;
+  }
   auto dnums = instruction->dot_dimension_numbers();
   DotDimensionNumbers default_dimension_numbers;
   default_dimension_numbers.add_lhs_contracting_dimensions(
@@ -1218,6 +1223,18 @@ StatusOr<mlir::Operation*> HloFunctionImporter::ImportInstructionImpl(
           loc, func_builder->getZeroAttr(type));
       return {func_builder->create<mlir::mhlo::CompareOp>(
           loc, operands[0], zero, func_builder->getStringAttr("NE"))};
+    }
+    case HloOpcode::kOptimizationBarrier: {
+      llvm::SmallVector<Value> flattened_operands;
+      llvm::SmallVector<Type> flattened_operand_types;
+      FlattenTupleType(operands[0].getType(), flattened_operand_types);
+      FlattenTupleValue(func_builder, loc, operands[0], flattened_operands);
+
+      auto op = func_builder->create<mlir::mhlo::OptimizationBarrierOp>(
+          loc, flattened_operand_types, flattened_operands);
+
+      return CreateTupleFromOpResults(func_builder, loc, op.getOperation(),
+                                      operands[0].getType());
     }
 
 #define NO_ATTRIBUTE_CASE(hlo_op_code, mlir_op)                               \

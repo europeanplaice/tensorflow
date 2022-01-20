@@ -34,7 +34,7 @@ limitations under the License.
 #include "mlir/IR/Dialect.h"  // from @llvm-project
 #include "mlir/IR/DialectImplementation.h"  // from @llvm-project
 #include "mlir/IR/FunctionImplementation.h"  // from @llvm-project
-#include "mlir/IR/FunctionSupport.h"  // from @llvm-project
+#include "mlir/IR/FunctionInterfaces.h"  // from @llvm-project
 #include "mlir/IR/MLIRContext.h"  // from @llvm-project
 #include "mlir/IR/OperationSupport.h"  // from @llvm-project
 #include "mlir/IR/SymbolTable.h"  // from @llvm-project
@@ -45,6 +45,7 @@ limitations under the License.
 #include "mlir/Support/LogicalResult.h"  // from @llvm-project
 #include "tensorflow/core/ir/dialect.h"
 #include "tensorflow/core/ir/types/dialect.h"
+#include "tensorflow/core/ir/utility.h"
 
 // Generated definitions.
 #include "tensorflow/core/ir/dialect.cc.inc"
@@ -331,8 +332,9 @@ static bool VerifyGenericTFGOperation(Operation &op) {
 //===----------------------------------------------------------------------===//
 
 static void PrintGraphOp(OpAsmPrinter &p, GraphOp op) {
-  p << " " << op.version();
+  p << ' ' << op.version();
   p.printOptionalAttrDictWithKeyword(op->getAttrs(), {"version"});
+  p << ' ';
   p.printRegion(op.getBodyRegion());
 }
 
@@ -582,10 +584,10 @@ static ParseResult ParseGraphFunc(OpAsmParser &parser, OperationState &result) {
   assert(arg_attrs.size() == arg_types.size());
   assert(result_attrs.size() == result_types.size());
   result.attributes.append(
-      builder.getNamedAttr(function_like_impl::getArgDictAttrName(),
+      builder.getNamedAttr(FunctionOpInterface::getArgDictAttrName(),
                            builder.getArrayAttr(arg_attrs)));
   result.attributes.append(
-      builder.getNamedAttr(function_like_impl::getResultDictAttrName(),
+      builder.getNamedAttr(FunctionOpInterface::getResultDictAttrName(),
                            builder.getArrayAttr(result_attrs)));
 
   // Parse the function body.
@@ -657,10 +659,11 @@ static void PrintGraphFunc(GraphFuncOp op, OpAsmPrinter &p) {
   // Print attributes.
   if (!op->getAttrs().empty()) {
     p.printNewline();
-    function_like_impl::printFunctionAttributes(
+    function_interface_impl::printFunctionAttributes(
         p, op, fnType.getNumInputs(), fnType.getNumResults(), {"generic"});
   }
   // Print body.
+  p << ' ';
   p.printRegion(op->getRegion(0), /*printEntryBlockArgs=*/false);
 }
 
@@ -677,6 +680,18 @@ GraphFuncOp GraphFuncOp::getCalledFunction(Operation *op,
     if (callee) return callee;
   }
   return symbol_table.lookup<GraphFuncOp>(op->getName().stripDialect());
+}
+
+BlockArgument GraphFuncOp::getDataValueOf(BlockArgument ctl) {
+  return ctl.getOwner()->getArgument(ctl.getArgNumber() - 1);
+}
+
+BlockArgument GraphFuncOp::getControlTokenOf(BlockArgument data) {
+  return data.getOwner()->getArgument(data.getArgNumber() + 1);
+}
+
+BlockArgument GraphFuncOp::getDataValue(Region &region, unsigned idx) {
+  return region.getArgument(idx * 2);
 }
 
 // This is naming block arguments for GraphFuncOp, we rely on the arg attributes
@@ -792,6 +807,19 @@ static LogicalResult VerifySignature(GraphFuncOp func, Operation *op,
           << " does not match corresponding op result dtype: " << res_type);
     }
   }
+  return success();
+}
+
+//===----------------------------------------------------------------------===//
+// CastOp
+
+LogicalResult CastOp::fold(ArrayRef<Attribute> operands,
+                           SmallVectorImpl<OpFoldResult> &results) {
+  // If the op has control operands, we can't fold.
+  if (!ctls().empty()) return failure();
+  if (getElementTypeOrSelf(x()) != getElementTypeOrSelf(y())) return failure();
+  results.push_back(x());
+  results.push_back(LookupControlDependency(x()));
   return success();
 }
 

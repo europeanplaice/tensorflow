@@ -120,7 +120,7 @@ void CollectChainResources(
 //
 // For example,
 // ```
-// %merged_control = "tf_executor.island"(%control_a, %control_b) ( {
+// %merged_control = "tf_executor.island"(%control_a, %control_b) ({
 //   "tf.NoOp"() : () -> ()
 //   "tf_executor.yield"() : () -> ()
 // }) : (!tf_executor.control, !tf_executor.control) -> (!tf_executor.control)
@@ -193,8 +193,9 @@ void AppendFunctionArguments(FuncOp func, int num_resources,
     func.getRegion().addArgument(chaining_data_type);
   }
 
-  FunctionType ftype = FunctionType::get(
-      func.getContext(), func.getArgumentTypes(), func.getType().getResults());
+  FunctionType ftype =
+      FunctionType::get(func.getContext(), func.getBody().getArgumentTypes(),
+                        func.getType().getResults());
   func.setType(ftype);
 }
 
